@@ -7,7 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"mangahub/internal/auth"
+	"mangahub/internal/library"
 	"mangahub/internal/manga"
+	"mangahub/internal/sync"
 	"mangahub/pkg/database"
 	"mangahub/pkg/utils"
 )
@@ -23,8 +25,25 @@ func main() {
 
 	router := gin.Default()
 
+	// Optional: avoid “trusted all proxies” warning
+	_ = router.SetTrustedProxies([]string{"127.0.0.1"})
+
+	// Start TCP sync first (so you notice binding errors early)
+	hub := sync.NewHub()
+	tcpSrv := sync.NewServer(":7070", hub)
+
+	errCh := make(chan error, 2)
+	go func() { errCh <- tcpSrv.Run() }()
+
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "db": cfg.Path})
+	})
+
+	router.GET("/debug", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"db":          cfg.Path,
+			"tcp_clients": hub.Count(),
+		})
 	})
 
 	// Manga (public)
@@ -43,9 +62,10 @@ func main() {
 	authHandler := auth.NewHandler(authRepo, tokenSvc)
 	authHandler.RegisterRoutes(router.Group("/auth"))
 
-	// Protected routes placeholder (we’ll add /users next)
+	// Protected routes
 	protected := router.Group("/users")
 	protected.Use(auth.AuthMiddleware(tokenSvc))
+
 	protected.GET("/me", func(c *gin.Context) {
 		claims := auth.MustGetClaims(c)
 		c.JSON(http.StatusOK, gin.H{
@@ -55,8 +75,14 @@ func main() {
 		})
 	})
 
+	// Library (protected)
+	libRepo := library.NewRepo(db)
+	libHandler := library.NewHandler(libRepo, hub)
+	libHandler.RegisterRoutes(protected)
+
 	log.Println("HTTP API server listening on :8080")
-	if err := router.Run(":8080"); err != nil {
-		log.Fatalf("server failed: %v", err)
-	}
+	go func() { errCh <- router.Run(":8080") }()
+
+	// Single place to exit if any server fails
+	log.Fatalf("server stopped: %v", <-errCh)
 }
