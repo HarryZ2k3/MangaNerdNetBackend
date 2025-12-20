@@ -1,0 +1,66 @@
+services:
+  mirror:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: mirror-server
+    container_name: mangahub-mirror
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: api-server
+    container_name: mangahub-api
+    depends_on:
+      mirror:
+        condition: service_healthy
+    environment:
+      # Persist SQLite under /data/.mangahub/data.db by controlling HOME
+      HOME: /data
+
+      # JWT config (match your utils.LoadAuthConfig expectations)
+      MANGAHUB_JWT_SECRET: "dev-secret-change-me"
+      MANGAHUB_JWT_ISSUER: "mangahub"
+      MANGAHUB_JWT_DURATION: "24h"
+    volumes:
+      - mangahub_data:/data
+    ports:
+      - "8080:8080"
+      - "7070:7070"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: scraper
+    container_name: mangahub-scraper
+    depends_on:
+      mirror:
+        condition: service_healthy
+    environment:
+      HOME: /data
+      MIRROR_BASE_URL: "http://mirror:9000"
+    volumes:
+      - mangahub_data:/data
+    restart: "no"
+    # This is a one-off job; don't keep it running.
+    # We'll run it manually with: docker compose run --rm scraper
+
+volumes:
+  mangahub_data:

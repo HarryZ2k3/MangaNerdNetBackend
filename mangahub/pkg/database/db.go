@@ -15,8 +15,14 @@ type Config struct {
 }
 
 func DefaultConfig() Config {
+	// ✅ Docker Compose / env override
+	if p := os.Getenv("MANGAHUB_DB_PATH"); p != "" {
+		return Config{Path: p}
+	}
+
+	// local default: ~/.mangahub/data.db
 	home, err := os.UserHomeDir()
-	if err != nil {
+	if err != nil || home == "" {
 		home = "."
 	}
 	return Config{
@@ -38,7 +44,17 @@ func Open(cfg Config) (*sql.DB, error) {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 
+	if _, err := db.Exec(`PRAGMA foreign_keys = ON;`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("pragma foreign_keys: %w", err)
+	}
+	if _, err := db.Exec(`PRAGMA journal_mode = WAL;`); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("pragma journal_mode: %w", err)
+	}
+
 	if err := db.Ping(); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 

@@ -28,7 +28,10 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write(b)
 	})
-
-	log.Println("mirror-server listening on http://localhost:9000")
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+	log.Println("mirror-server listening on :9000")
 	log.Fatal(http.ListenAndServe(":9000", nil))
 }

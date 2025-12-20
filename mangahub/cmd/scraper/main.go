@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"mangahub/internal/scraper"
@@ -21,11 +22,16 @@ func main() {
 		log.Fatalf("db migrate failed: %v", err)
 	}
 
+	mirrorBaseURL := os.Getenv("MIRROR_BASE_URL")
+	if mirrorBaseURL == "" {
+		mirrorBaseURL = "http://localhost:9000"
+	}
+
 	// Source A: MangaDex (live)
 	srcA := scraper.NewSourceA()
 
 	// Source B: local mirror server (demo-safe)
-	srcB := scraper.NewSourceB("http://localhost:9000")
+	srcB := scraper.NewSourceB(mirrorBaseURL)
 
 	agg := scraper.NewAggregator(srcA, srcB)
 
