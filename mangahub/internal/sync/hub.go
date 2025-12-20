@@ -7,16 +7,20 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 type Hub struct {
-	mu      sync.Mutex
-	clients map[net.Conn]struct{}
+	mu        sync.Mutex
+	clients   map[net.Conn]struct{}
+	wsClients map[*websocket.Conn]struct{}
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		clients: make(map[net.Conn]struct{}),
+		clients:   make(map[net.Conn]struct{}),
+		wsClients: make(map[*websocket.Conn]struct{}),
 	}
 }
 
@@ -33,17 +37,30 @@ func (h *Hub) Remove(conn net.Conn) {
 	_ = conn.Close()
 }
 
+func (h *Hub) AddWS(ws *websocket.Conn) {
+	h.mu.Lock()
+	h.wsClients[ws] = struct{}{}
+	h.mu.Unlock()
+}
+
+func (h *Hub) RemoveWS(ws *websocket.Conn) {
+	h.mu.Lock()
+	delete(h.wsClients, ws)
+	h.mu.Unlock()
+	_ = ws.Close()
+}
+
 func (h *Hub) BroadcastJSON(v any) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return
 	}
-	// newline-delimited JSON (NDJSON) so clients can read line-by-line
 	b = append(b, '\n')
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	// TCP clients
 	for c := range h.clients {
 		_ = c.SetWriteDeadline(time.Now().Add(2 * time.Second))
 		w := bufio.NewWriter(c)
@@ -56,6 +73,14 @@ func (h *Hub) BroadcastJSON(v any) {
 			_ = c.Close()
 			delete(h.clients, c)
 			continue
+		}
+	}
+
+	// WebSocket clients
+	for ws := range h.wsClients {
+		if err := ws.WriteMessage(websocket.TextMessage, b); err != nil {
+			_ = ws.Close()
+			delete(h.wsClients, ws)
 		}
 	}
 }

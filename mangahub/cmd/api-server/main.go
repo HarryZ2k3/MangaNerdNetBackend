@@ -30,6 +30,7 @@ func main() {
 
 	// Start TCP sync first (so you notice binding errors early)
 	hub := sync.NewHub()
+	router.GET("/ws", sync.WSHandler(hub))
 	tcpSrv := sync.NewServer(":7070", hub)
 
 	errCh := make(chan error, 2)
