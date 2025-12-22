@@ -65,7 +65,7 @@ func main() {
 
 	// Protected routes
 	protected := router.Group("/users")
-	protected.Use(auth.AuthMiddleware(tokenSvc))
+	protected.Use(auth.AuthMiddleware(tokenSvc, authRepo))
 
 	protected.GET("/me", func(c *gin.Context) {
 		claims := auth.MustGetClaims(c)

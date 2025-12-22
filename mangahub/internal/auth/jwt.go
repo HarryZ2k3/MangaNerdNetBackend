@@ -14,9 +14,10 @@ type TokenService struct {
 }
 
 type Claims struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	UserID       string `json:"user_id"`
+	Username     string `json:"username"`
+	Email        string `json:"email"`
+	TokenVersion int    `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
@@ -24,9 +25,10 @@ func (ts TokenService) Sign(u *User) (string, time.Time, error) {
 	exp := time.Now().Add(ts.Duration)
 
 	claims := Claims{
-		UserID:   u.ID,
-		Username: u.Username,
-		Email:    u.Email,
+		UserID:       u.ID,
+		Username:     u.Username,
+		Email:        u.Email,
+		TokenVersion: u.TokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    ts.Issuer,
 			Subject:   u.ID,

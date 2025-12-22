@@ -22,6 +22,8 @@ func NewHandler(repo *Repo, tokens TokenService) *Handler {
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/register", h.register)
 	rg.POST("/login", h.login)
+	rg.POST("/change-password", AuthMiddleware(h.Tokens, h.Repo), h.changePassword)
+	rg.POST("/logout", AuthMiddleware(h.Tokens, h.Repo), h.logout)
 }
 
 type registerReq struct {
@@ -146,4 +148,70 @@ func (h *Handler) login(c *gin.Context) {
 		"token":      token,
 		"expires_at": exp.UTC().Format(time.RFC3339),
 	})
+}
+
+type changePasswordReq struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+func (h *Handler) changePassword(c *gin.Context) {
+	var req changePasswordReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
+		return
+	}
+	if req.OldPassword == "" || req.NewPassword == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "old and new password required"})
+		return
+	}
+	if len(req.NewPassword) < 8 || len(req.NewPassword) > 72 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "password must be 8-72 chars"})
+		return
+	}
+
+	claims := MustGetClaims(c)
+	if claims == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
+
+	u, err := h.Repo.GetByID(c.Request.Context(), claims.UserID)
+	if err != nil || u == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.OldPassword)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "hash failed"})
+		return
+	}
+
+	if err := h.Repo.UpdatePasswordAndBumpTokenVersion(c.Request.Context(), u.ID, string(hash)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "update password failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "password updated"})
+}
+
+func (h *Handler) logout(c *gin.Context) {
+	claims := MustGetClaims(c)
+	if claims == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
+
+	if err := h.Repo.BumpTokenVersion(c.Request.Context(), claims.UserID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "logout failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "logged out"})
 }
