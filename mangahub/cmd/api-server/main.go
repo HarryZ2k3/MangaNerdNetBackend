@@ -17,6 +17,7 @@ import (
 	"mangahub/internal/chat"
 	"mangahub/internal/library"
 	"mangahub/internal/manga"
+	"mangahub/internal/progress"
 	"mangahub/internal/reviews"
 	"mangahub/internal/sync"
 	synchub "mangahub/internal/sync"
@@ -125,6 +126,10 @@ func main() {
 	libHandler := library.NewHandler(libRepo, hub)
 	libHandler.RegisterRoutes(protected)
 
+	// Progress history (protected)
+	progressRepo := progress.NewRepo(db)
+	progressHandler := progress.NewHandler(progressRepo)
+	progressHandler.RegisterRoutes(protected)
 	// Reviews (protected)
 	protectedReviews := router.Group("")
 	protectedReviews.Use(auth.AuthMiddleware(tokenSvc))
