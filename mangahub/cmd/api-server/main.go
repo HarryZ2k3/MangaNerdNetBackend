@@ -9,6 +9,7 @@ import (
 	"mangahub/internal/auth"
 	"mangahub/internal/library"
 	"mangahub/internal/manga"
+	"mangahub/internal/notify"
 	"mangahub/internal/sync"
 	"mangahub/pkg/database"
 	"mangahub/pkg/utils"
@@ -32,9 +33,12 @@ func main() {
 	hub := sync.NewHub()
 	router.GET("/ws", sync.WSHandler(hub))
 	tcpSrv := sync.NewServer(":7070", hub)
+	notifyRegistry := notify.NewRegistry()
+	notifyServer := notify.NewServer(":9090", notifyRegistry, log.Default())
 
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
 	go func() { errCh <- tcpSrv.Run() }()
+	go func() { errCh <- notifyServer.Run() }()
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "db": cfg.Path})
@@ -80,6 +84,23 @@ func main() {
 	libRepo := library.NewRepo(db)
 	libHandler := library.NewHandler(libRepo, hub)
 	libHandler.RegisterRoutes(protected)
+
+	router.POST("/notify/release", func(c *gin.Context) {
+		var payload struct {
+			MangaID string `json:"manga_id"`
+			Chapter int    `json:"chapter"`
+		}
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if payload.MangaID == "" || payload.Chapter <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "manga_id and chapter are required"})
+			return
+		}
+		notifyServer.BroadcastNewChapter(payload.MangaID, payload.Chapter)
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	log.Println("HTTP API server listening on :8080")
 	go func() { errCh <- router.Run(":8080") }()
