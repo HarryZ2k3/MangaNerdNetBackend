@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"mangahub/internal/auth"
+	"mangahub/internal/chat"
 	"mangahub/internal/library"
 	"mangahub/internal/manga"
 	synchub "mangahub/internal/sync"
@@ -36,9 +37,16 @@ func main() {
 	_ = router.SetTrustedProxies([]string{"127.0.0.1"})
 
 	// Start TCP sync first (so you notice binding errors early)
-	hub := synchub.NewHub()
-	router.GET("/ws", synchub.WSHandler(hub))
-	tcpSrv := synchub.NewServer(":7070", hub)
+	hub := sync.NewHub()
+	router.GET("/ws", sync.WSHandler(hub))
+	tcpSrv := sync.NewServer(":7070", hub)
+
+	chatHub := chat.NewHub(50)
+	router.GET("/ws/chat", chat.WSHandler(chatHub))
+	router.GET("/chat/history", chat.HistoryHandler(chatHub))
+
+	errCh := make(chan error, 2)
+	go func() { errCh <- tcpSrv.Run() }()
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "db": cfg.Path})
