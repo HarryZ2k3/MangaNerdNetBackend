@@ -11,6 +11,10 @@ type AuthConfig struct {
 	JWTDuration time.Duration
 }
 
+type GrpcConfig struct {
+	Addr string
+}
+
 func LoadAuthConfig() AuthConfig {
 	secret := os.Getenv("MANGAHUB_JWT_SECRET")
 	if secret == "" {
@@ -39,4 +43,13 @@ func LoadAuthConfig() AuthConfig {
 		JWTIssuer:   issuer,
 		JWTDuration: 24 * time.Hour,
 	}
+}
+
+func LoadGrpcConfig() GrpcConfig {
+	addr := os.Getenv("MANGAHUB_GRPC_ADDR")
+	if addr == "" {
+		addr = ":9090"
+	}
+
+	return GrpcConfig{Addr: addr}
 }

@@ -27,7 +27,7 @@ WORKDIR /app
 
 COPY --from=builder /out/app /app/app
 
-# default ports used by our binaries (api:8080, tcp:7070, mirror:9000)
-EXPOSE 8080 7070 9000
+# default ports used by our binaries (api:8080, tcp:7070, mirror:9000, grpc:9090)
+EXPOSE 8080 7070 9000 9090
 
 ENTRYPOINT ["/app/app"]
