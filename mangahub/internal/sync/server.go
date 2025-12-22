@@ -2,6 +2,7 @@ package sync
 
 import (
 	"bufio"
+	"errors"
 	"log"
 	"net"
 )
@@ -9,6 +10,7 @@ import (
 type Server struct {
 	Addr string
 	Hub  *Hub
+	ln   net.Listener
 }
 
 func NewServer(addr string, hub *Hub) *Server {
@@ -20,11 +22,16 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
+	s.ln = ln
 	log.Printf("[tcp-sync] listening on %s", s.Addr)
 
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+			log.Printf("[tcp-sync] accept error: %v", err)
 			continue
 		}
 
@@ -45,4 +52,11 @@ func (s *Server) Run() error {
 			}
 		}(conn)
 	}
+}
+
+func (s *Server) Close() error {
+	if s.ln == nil {
+		return nil
+	}
+	return s.ln.Close()
 }

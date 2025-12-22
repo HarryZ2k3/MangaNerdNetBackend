@@ -17,6 +17,11 @@ type Hub struct {
 	wsClients map[*websocket.Conn]struct{}
 }
 
+type Stats struct {
+	TCPClients int `json:"tcp_clients"`
+	WSClients  int `json:"ws_clients"`
+}
+
 func NewHub() *Hub {
 	return &Hub{
 		clients:   make(map[net.Conn]struct{}),
@@ -89,6 +94,15 @@ func (h *Hub) Count() int {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return len(h.clients)
+}
+
+func (h *Hub) Stats() Stats {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return Stats{
+		TCPClients: len(h.clients),
+		WSClients:  len(h.wsClients),
+	}
 }
 
 func (h *Hub) Welcome(conn net.Conn) {
