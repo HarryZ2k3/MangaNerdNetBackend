@@ -9,6 +9,7 @@ import (
 	"mangahub/internal/auth"
 	"mangahub/internal/library"
 	"mangahub/internal/manga"
+	"mangahub/internal/reviews"
 	"mangahub/internal/sync"
 	"mangahub/pkg/database"
 	"mangahub/pkg/utils"
@@ -52,6 +53,11 @@ func main() {
 	mangaHandler := manga.NewHandler(mangaRepo)
 	mangaHandler.RegisterRoutes(router.Group("/manga"))
 
+	// Reviews (public)
+	reviewRepo := reviews.NewRepo(db)
+	reviewHandler := reviews.NewHandler(reviewRepo)
+	reviewHandler.RegisterPublicRoutes(router.Group(""))
+
 	// Auth
 	authCfg := utils.LoadAuthConfig()
 	tokenSvc := auth.TokenService{
@@ -80,6 +86,11 @@ func main() {
 	libRepo := library.NewRepo(db)
 	libHandler := library.NewHandler(libRepo, hub)
 	libHandler.RegisterRoutes(protected)
+
+	// Reviews (protected)
+	protectedReviews := router.Group("")
+	protectedReviews.Use(auth.AuthMiddleware(tokenSvc))
+	reviewHandler.RegisterProtectedRoutes(protectedReviews)
 
 	log.Println("HTTP API server listening on :8080")
 	go func() { errCh <- router.Run(":8080") }()
