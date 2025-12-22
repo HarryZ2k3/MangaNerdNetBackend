@@ -1,15 +1,22 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"mangahub/internal/auth"
 	"mangahub/internal/library"
 	"mangahub/internal/manga"
-	"mangahub/internal/sync"
+	synchub "mangahub/internal/sync"
 	"mangahub/pkg/database"
 	"mangahub/pkg/utils"
 )
@@ -29,21 +36,43 @@ func main() {
 	_ = router.SetTrustedProxies([]string{"127.0.0.1"})
 
 	// Start TCP sync first (so you notice binding errors early)
-	hub := sync.NewHub()
-	router.GET("/ws", sync.WSHandler(hub))
-	tcpSrv := sync.NewServer(":7070", hub)
-
-	errCh := make(chan error, 2)
-	go func() { errCh <- tcpSrv.Run() }()
+	hub := synchub.NewHub()
+	router.GET("/ws", synchub.WSHandler(hub))
+	tcpSrv := synchub.NewServer(":7070", hub)
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "db": cfg.Path})
 	})
 
+	router.GET("/ready", func(c *gin.Context) {
+		stats := hub.Stats()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+
+		if err := db.PingContext(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":      "not_ready",
+				"db_error":    err.Error(),
+				"tcp_clients": stats.TCPClients,
+				"ws_clients":  stats.WSClients,
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status":      "ready",
+			"db":          "ok",
+			"tcp_clients": stats.TCPClients,
+			"ws_clients":  stats.WSClients,
+		})
+	})
+
 	router.GET("/debug", func(c *gin.Context) {
+		stats := hub.Stats()
 		c.JSON(http.StatusOK, gin.H{
 			"db":          cfg.Path,
-			"tcp_clients": hub.Count(),
+			"tcp_clients": stats.TCPClients,
+			"ws_clients":  stats.WSClients,
 		})
 	})
 
@@ -81,9 +110,52 @@ func main() {
 	libHandler := library.NewHandler(libRepo, hub)
 	libHandler.RegisterRoutes(protected)
 
-	log.Println("HTTP API server listening on :8080")
-	go func() { errCh <- router.Run(":8080") }()
+	httpSrv := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
 
-	// Single place to exit if any server fails
-	log.Fatalf("server stopped: %v", <-errCh)
+	errCh := make(chan error, 2)
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := tcpSrv.Run(); err != nil {
+			errCh <- err
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		log.Println("HTTP API server listening on :8080")
+		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case sig := <-sigCh:
+		log.Printf("shutdown signal received: %s", sig)
+	case err := <-errCh:
+		log.Printf("server error: %v", err)
+	}
+
+	log.Println("shutting down servers")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("http shutdown error: %v", err)
+	}
+	if err := tcpSrv.Close(); err != nil {
+		log.Printf("tcp shutdown error: %v", err)
+	}
+
+	wg.Wait()
+	log.Println("servers stopped")
 }
