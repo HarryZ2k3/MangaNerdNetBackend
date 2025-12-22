@@ -9,6 +9,7 @@ require (
 	github.com/gorilla/websocket v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.32
 	golang.org/x/crypto v0.46.0
+	google.golang.org/grpc v1.74.2
 )
 
 require (

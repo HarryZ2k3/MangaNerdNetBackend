@@ -43,6 +43,24 @@ services:
       timeout: 3s
       retries: 20
 
+  grpc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: grpc-server
+    container_name: mangahub-grpc
+    depends_on:
+      mirror:
+        condition: service_healthy
+    environment:
+      HOME: /data
+      MANGAHUB_GRPC_ADDR: ":9090"
+    volumes:
+      - mangahub_data:/data
+    ports:
+      - "9090:9090"
+
   scraper:
     build:
       context: .
