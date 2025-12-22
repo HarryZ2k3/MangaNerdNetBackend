@@ -1,16 +1,25 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"mangahub/internal/auth"
+	"mangahub/internal/chat"
 	"mangahub/internal/library"
 	"mangahub/internal/manga"
 	"mangahub/internal/reviews"
 	"mangahub/internal/sync"
+	synchub "mangahub/internal/sync"
 	"mangahub/pkg/database"
 	"mangahub/pkg/utils"
 )
@@ -34,6 +43,10 @@ func main() {
 	router.GET("/ws", sync.WSHandler(hub))
 	tcpSrv := sync.NewServer(":7070", hub)
 
+	chatHub := chat.NewHub(50)
+	router.GET("/ws/chat", chat.WSHandler(chatHub))
+	router.GET("/chat/history", chat.HistoryHandler(chatHub))
+
 	errCh := make(chan error, 2)
 	go func() { errCh <- tcpSrv.Run() }()
 
@@ -41,10 +54,35 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "db": cfg.Path})
 	})
 
+	router.GET("/ready", func(c *gin.Context) {
+		stats := hub.Stats()
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+
+		if err := db.PingContext(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status":      "not_ready",
+				"db_error":    err.Error(),
+				"tcp_clients": stats.TCPClients,
+				"ws_clients":  stats.WSClients,
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"status":      "ready",
+			"db":          "ok",
+			"tcp_clients": stats.TCPClients,
+			"ws_clients":  stats.WSClients,
+		})
+	})
+
 	router.GET("/debug", func(c *gin.Context) {
+		stats := hub.Stats()
 		c.JSON(http.StatusOK, gin.H{
 			"db":          cfg.Path,
-			"tcp_clients": hub.Count(),
+			"tcp_clients": stats.TCPClients,
+			"ws_clients":  stats.WSClients,
 		})
 	})
 
@@ -71,7 +109,7 @@ func main() {
 
 	// Protected routes
 	protected := router.Group("/users")
-	protected.Use(auth.AuthMiddleware(tokenSvc))
+	protected.Use(auth.AuthMiddleware(tokenSvc, authRepo))
 
 	protected.GET("/me", func(c *gin.Context) {
 		claims := auth.MustGetClaims(c)
@@ -91,10 +129,71 @@ func main() {
 	protectedReviews := router.Group("")
 	protectedReviews.Use(auth.AuthMiddleware(tokenSvc))
 	reviewHandler.RegisterProtectedRoutes(protectedReviews)
+	router.POST("/notify/release", func(c *gin.Context) {
+		var payload struct {
+			MangaID string `json:"manga_id"`
+			Chapter int    `json:"chapter"`
+		}
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if payload.MangaID == "" || payload.Chapter <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "manga_id and chapter are required"})
+			return
+		}
+		notifyServer.BroadcastNewChapter(payload.MangaID, payload.Chapter)
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	log.Println("HTTP API server listening on :8080")
 	go func() { errCh <- router.Run(":8080") }()
+	httpSrv := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
 
-	// Single place to exit if any server fails
-	log.Fatalf("server stopped: %v", <-errCh)
+	errCh := make(chan error, 2)
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := tcpSrv.Run(); err != nil {
+			errCh <- err
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		log.Println("HTTP API server listening on :8080")
+		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case sig := <-sigCh:
+		log.Printf("shutdown signal received: %s", sig)
+	case err := <-errCh:
+		log.Printf("server error: %v", err)
+	}
+
+	log.Println("shutting down servers")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("http shutdown error: %v", err)
+	}
+	if err := tcpSrv.Close(); err != nil {
+		log.Printf("tcp shutdown error: %v", err)
+	}
+
+	wg.Wait()
+	log.Println("servers stopped")
 }

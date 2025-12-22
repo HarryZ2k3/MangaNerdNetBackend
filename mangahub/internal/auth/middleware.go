@@ -9,7 +9,7 @@ import (
 
 const CtxClaimsKey = "auth_claims"
 
-func AuthMiddleware(tokens TokenService) gin.HandlerFunc {
+func AuthMiddleware(tokens TokenService, repo *Repo) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		h := c.GetHeader("Authorization")
 		if h == "" || !strings.HasPrefix(strings.ToLower(h), "bearer ") {
@@ -24,6 +24,14 @@ func AuthMiddleware(tokens TokenService) gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			c.Abort()
 			return
+		}
+		if repo != nil {
+			currentVersion, err := repo.GetTokenVersion(c.Request.Context(), claims.UserID)
+			if err != nil || currentVersion != claims.TokenVersion {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+				c.Abort()
+				return
+			}
 		}
 
 		c.Set(CtxClaimsKey, claims)
