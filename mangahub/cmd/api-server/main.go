@@ -17,6 +17,8 @@ import (
 	"mangahub/internal/chat"
 	"mangahub/internal/library"
 	"mangahub/internal/manga"
+	"mangahub/internal/reviews"
+	"mangahub/internal/sync"
 	synchub "mangahub/internal/sync"
 	"mangahub/pkg/database"
 	"mangahub/pkg/utils"
@@ -89,6 +91,11 @@ func main() {
 	mangaHandler := manga.NewHandler(mangaRepo)
 	mangaHandler.RegisterRoutes(router.Group("/manga"))
 
+	// Reviews (public)
+	reviewRepo := reviews.NewRepo(db)
+	reviewHandler := reviews.NewHandler(reviewRepo)
+	reviewHandler.RegisterPublicRoutes(router.Group(""))
+
 	// Auth
 	authCfg := utils.LoadAuthConfig()
 	tokenSvc := auth.TokenService{
@@ -118,6 +125,10 @@ func main() {
 	libHandler := library.NewHandler(libRepo, hub)
 	libHandler.RegisterRoutes(protected)
 
+	// Reviews (protected)
+	protectedReviews := router.Group("")
+	protectedReviews.Use(auth.AuthMiddleware(tokenSvc))
+	reviewHandler.RegisterProtectedRoutes(protectedReviews)
 	router.POST("/notify/release", func(c *gin.Context) {
 		var payload struct {
 			MangaID string `json:"manga_id"`
