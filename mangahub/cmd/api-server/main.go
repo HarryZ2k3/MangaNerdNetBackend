@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"mangahub/internal/auth"
+	"mangahub/internal/chat"
 	"mangahub/internal/library"
 	"mangahub/internal/manga"
 	"mangahub/internal/sync"
@@ -32,6 +33,10 @@ func main() {
 	hub := sync.NewHub()
 	router.GET("/ws", sync.WSHandler(hub))
 	tcpSrv := sync.NewServer(":7070", hub)
+
+	chatHub := chat.NewHub(50)
+	router.GET("/ws/chat", chat.WSHandler(chatHub))
+	router.GET("/chat/history", chat.HistoryHandler(chatHub))
 
 	errCh := make(chan error, 2)
 	go func() { errCh <- tcpSrv.Run() }()
