@@ -31,6 +31,17 @@ CREATE TABLE IF NOT EXISTS user_progress (
   FOREIGN KEY (manga_id) REFERENCES manga(id)
 );
 
+-- user progress history table
+CREATE TABLE IF NOT EXISTS user_progress_history (
+  user_id TEXT NOT NULL,
+  manga_id TEXT NOT NULL,
+  chapter INTEGER NOT NULL,
+  volume INTEGER,
+  at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (manga_id) REFERENCES manga(id)
+);
+
 -- reviews table (bonus feature)
 CREATE TABLE IF NOT EXISTS reviews (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

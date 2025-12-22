@@ -9,6 +9,7 @@ import (
 	"mangahub/internal/auth"
 	"mangahub/internal/library"
 	"mangahub/internal/manga"
+	"mangahub/internal/progress"
 	"mangahub/internal/sync"
 	"mangahub/pkg/database"
 	"mangahub/pkg/utils"
@@ -80,6 +81,11 @@ func main() {
 	libRepo := library.NewRepo(db)
 	libHandler := library.NewHandler(libRepo, hub)
 	libHandler.RegisterRoutes(protected)
+
+	// Progress history (protected)
+	progressRepo := progress.NewRepo(db)
+	progressHandler := progress.NewHandler(progressRepo)
+	progressHandler.RegisterRoutes(protected)
 
 	log.Println("HTTP API server listening on :8080")
 	go func() { errCh <- router.Run(":8080") }()

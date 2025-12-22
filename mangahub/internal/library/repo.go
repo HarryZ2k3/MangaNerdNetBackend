@@ -19,7 +19,12 @@ func NewRepo(db *sql.DB) *Repo {
 
 // Upsert inserts or updates a user's library item
 func (r *Repo) Upsert(ctx context.Context, item models.LibraryItem) error {
-	_, err := r.DB.ExecContext(ctx, `
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin library upsert: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO user_progress (user_id, manga_id, current_chapter, status, updated_at)
 		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(user_id, manga_id) DO UPDATE SET
@@ -28,7 +33,21 @@ func (r *Repo) Upsert(ctx context.Context, item models.LibraryItem) error {
 			updated_at = CURRENT_TIMESTAMP
 	`, item.UserID, item.MangaID, item.CurrentChapter, item.Status)
 	if err != nil {
+		_ = tx.Rollback()
 		return fmt.Errorf("upsert library item: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO user_progress_history (user_id, manga_id, chapter, volume, at)
+		VALUES (?, ?, ?, NULL, CURRENT_TIMESTAMP)
+	`, item.UserID, item.MangaID, item.CurrentChapter)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("insert progress history: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit library upsert: %w", err)
 	}
 	return nil
 }
