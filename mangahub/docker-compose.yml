@@ -13,7 +13,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-
+    volumes:
+      - ./data:/app/data:ro
   api:
     build:
       context: .
