@@ -28,6 +28,7 @@ WORKDIR /app
 
 COPY --from=builder /out/app /app/app
 COPY --from=builder /src/docs /app/docs
+COPY --from=builder /src/data /app/data
 
 RUN chmod +x /app/app
 

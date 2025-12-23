@@ -9,7 +9,7 @@ import (
 
 func main() {
 	// serves data/mirror.json at GET /titles
-	dataPath := "data/mirror.json"
+	dataPath := resolveDataPath()
 
 	http.HandleFunc("/titles", func(w http.ResponseWriter, r *http.Request) {
 		b, err := os.ReadFile(dataPath)
@@ -34,4 +34,22 @@ func main() {
 	})
 	log.Println("mirror-server listening on :9000")
 	log.Fatal(http.ListenAndServe(":9000", nil))
+}
+
+func resolveDataPath() string {
+	if override := os.Getenv("MIRROR_DATA_PATH"); override != "" {
+		return override
+	}
+	if fileExists("data/mirror.json") {
+		return "data/mirror.json"
+	}
+	if fileExists("/app/data/mirror.json") {
+		return "/app/data/mirror.json"
+	}
+	return "data/mirror.json"
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
