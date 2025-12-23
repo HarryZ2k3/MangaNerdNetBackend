@@ -213,6 +213,117 @@ bindForm("manga-get-form", async (data) => {
   return apiFetch(`/manga/${data.id}`);
 });
 
+const mangaSamples = {
+  items: [],
+};
+const mangaSamplesList = document.getElementById("manga-samples");
+const mangaSamplesFilter = document.getElementById("manga-samples-filter");
+const mangaSamplesStatus = document.getElementById("manga-samples-status");
+const mangaSamplesLoad = document.getElementById("manga-samples-load");
+const mangaListForm = document.getElementById("manga-list-form");
+const mangaGetForm = document.getElementById("manga-get-form");
+
+function setMangaSamplesStatus(message) {
+  if (mangaSamplesStatus) {
+    mangaSamplesStatus.textContent = message;
+  }
+}
+
+function normalizeText(value) {
+  return String(value || "").toLowerCase();
+}
+
+function filterMangaSamples(term) {
+  if (!term) return mangaSamples.items;
+  const needle = normalizeText(term);
+  return mangaSamples.items.filter((item) => {
+    const haystack = [
+      item.title,
+      item.id,
+      item.author,
+      item.status,
+      ...(item.genres || []),
+    ]
+      .map(normalizeText)
+      .join(" ");
+    return haystack.includes(needle);
+  });
+}
+
+function renderMangaSamples(term = "") {
+  if (!mangaSamplesList) return;
+  mangaSamplesList.innerHTML = "";
+  const items = filterMangaSamples(term);
+  if (!items.length) {
+    setMangaSamplesStatus(term ? "No matches. Try a different filter." : "No samples loaded yet.");
+    return;
+  }
+  setMangaSamplesStatus(`Showing ${items.length} manga ready to test.`);
+  const fragment = document.createDocumentFragment();
+  items.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "sample-card";
+
+    const title = document.createElement("h4");
+    title.textContent = item.title || item.id;
+
+    const meta = document.createElement("div");
+    meta.className = "sample-meta";
+    const details = [
+      `ID: ${item.id}`,
+      item.author ? `Author: ${item.author}` : null,
+      item.status ? `Status: ${item.status}` : null,
+      item.genres && item.genres.length ? `Genres: ${item.genres.join(", ")}` : null,
+    ].filter(Boolean);
+    meta.textContent = details.join(" • ");
+
+    const actions = document.createElement("div");
+    actions.className = "sample-actions";
+
+    const searchButton = document.createElement("button");
+    searchButton.type = "button";
+    searchButton.textContent = "Search by Title";
+    searchButton.addEventListener("click", () => {
+      const searchInput = mangaListForm.querySelector("input[name='q']");
+      searchInput.value = item.title || "";
+      mangaListForm.requestSubmit();
+    });
+
+    const getButton = document.createElement("button");
+    getButton.type = "button";
+    getButton.textContent = "Fetch Details";
+    getButton.addEventListener("click", () => {
+      const idInput = mangaGetForm.querySelector("input[name='id']");
+      idInput.value = item.id;
+      mangaGetForm.requestSubmit();
+    });
+
+    actions.append(searchButton, getButton);
+    card.append(title, meta, actions);
+    fragment.appendChild(card);
+  });
+  mangaSamplesList.appendChild(fragment);
+}
+
+if (mangaSamplesLoad) {
+  mangaSamplesLoad.addEventListener("click", async () => {
+    setMangaSamplesStatus("Loading sample manga from /manga...");
+    try {
+      const result = await apiFetch("/manga?limit=20");
+      mangaSamples.items = Array.isArray(result.items) ? result.items : [];
+      renderMangaSamples(mangaSamplesFilter.value.trim());
+    } catch (error) {
+      setMangaSamplesStatus(`Failed to load samples: ${error.message}`);
+    }
+  });
+}
+
+if (mangaSamplesFilter) {
+  mangaSamplesFilter.addEventListener("input", (event) => {
+    renderMangaSamples(event.target.value.trim());
+  });
+}
+
 bindForm("library-upsert-form", async (data) => {
   const payload = {
     manga_id: data.manga_id,
