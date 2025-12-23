@@ -36,6 +36,10 @@ func main() {
 	router := gin.Default()
 	_ = router.SetTrustedProxies([]string{"127.0.0.1"})
 
+	// --- Demo UI ---
+	router.Static("/assets", "./web/assets")
+	router.StaticFile("/", "./web/index.html")
+
 	// --- Sync hub (WS + TCP) ---
 	hub := syncsrv.NewHub()
 	router.GET("/ws", syncsrv.WSHandler(hub))
