@@ -33,6 +33,8 @@ COPY --from=builder /src/web /app/web
 
 RUN chmod +x /app/app
 
+ENV MANGAHUB_DATA_PATH=/app/web
+
 USER app
 
 # default ports used by our binaries (api:8080, tcp:7070, mirror:9000, grpc:9090)

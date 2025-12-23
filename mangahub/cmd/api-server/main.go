@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	stdsync "sync"
 	"syscall"
 	"time"
@@ -37,8 +38,12 @@ func main() {
 	_ = router.SetTrustedProxies([]string{"127.0.0.1"})
 
 	// --- Demo UI ---
-	router.Static("/assets", "./web/assets")
-	router.StaticFile("/", "./web/index.html")
+	webRoot := os.Getenv("MANGAHUB_WEB_ROOT")
+	if webRoot == "" {
+		webRoot = "./web"
+	}
+	router.Static("/assets", filepath.Join(webRoot, "assets"))
+	router.StaticFile("/", filepath.Join(webRoot, "index.html"))
 
 	// --- Sync hub (WS + TCP) ---
 	hub := syncsrv.NewHub()
