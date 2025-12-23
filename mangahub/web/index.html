@@ -86,6 +86,19 @@
           <button type="submit">Fetch Manga</button>
         </form>
       </div>
+      <div class="divider"></div>
+      <div class="stack">
+        <div class="actions">
+          <h3 class="stack-title">Quick Search List</h3>
+          <button id="manga-samples-load" class="primary" type="button">Load Sample Manga</button>
+        </div>
+        <label class="field">
+          <span>Filter loaded manga</span>
+          <input id="manga-samples-filter" placeholder="search by title, genre, or author" />
+        </label>
+        <p id="manga-samples-status" class="muted">Load a sample list to populate quick actions.</p>
+        <div id="manga-samples" class="sample-list"></div>
+      </div>
     </section>
 
     <section class="card">

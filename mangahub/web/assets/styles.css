@@ -147,6 +147,49 @@ button.primary:hover {
   margin-top: 8px;
 }
 
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 24px 0;
+}
+
+.stack-title {
+  margin: 0;
+  align-self: center;
+}
+
+.sample-list {
+  display: grid;
+  gap: 12px;
+}
+
+.sample-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #fbfbff;
+  display: grid;
+  gap: 10px;
+}
+
+.sample-card h4 {
+  margin: 0;
+}
+
+.sample-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sample-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .log {
   min-height: 120px;
   background: #0f1324;
