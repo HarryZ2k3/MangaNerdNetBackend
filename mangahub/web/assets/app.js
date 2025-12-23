@@ -1,4 +1,5 @@
 const output = document.getElementById("output");
+const commandLog = document.getElementById("command-log");
 const baseURLInput = document.getElementById("base-url");
 const tokenPreview = document.getElementById("token-preview");
 const tokenInput = document.getElementById("token-input");
@@ -19,6 +20,36 @@ function appendLog(element, message) {
   const stamp = new Date().toISOString();
   element.textContent += `[${stamp}] ${message}\n`;
   element.scrollTop = element.scrollHeight;
+}
+
+function logCommand(command) {
+  if (!commandLog) return;
+  appendLog(commandLog, command);
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
+function buildCurlCommand(url, options, headers) {
+  const method = (options.method || "GET").toUpperCase();
+  const segments = ["curl"];
+
+  if (method !== "GET") {
+    segments.push(`-X ${method}`);
+  }
+
+  Object.entries(headers).forEach(([key, value]) => {
+    if (key === "Content-Type" && !options.body) return;
+    segments.push(`-H ${shellQuote(`${key}: ${value}`)}`);
+  });
+
+  if (options.body) {
+    segments.push(`--data ${shellQuote(options.body)}`);
+  }
+
+  segments.push(shellQuote(url));
+  return segments.join(" ");
 }
 
 function setToken(token) {
@@ -44,6 +75,7 @@ async function apiFetch(path, options = {}) {
     headers.Authorization = `Bearer ${state.token}`;
   }
 
+  logCommand(buildCurlCommand(url, options, headers));
   const response = await fetch(url, { ...options, headers });
   const text = await response.text();
   let payload = text;
@@ -271,6 +303,7 @@ document.getElementById("chat-connect").addEventListener("click", () => {
   const url = wsURL("/ws/chat", { room, user });
   const socket = new WebSocket(url);
   state.chatSocket = socket;
+  logCommand(`wscat -c ${shellQuote(url)}`);
   appendLog(chatLog, `Connecting to ${url}`);
   socket.addEventListener("open", () => appendLog(chatLog, "Chat connected"));
   socket.addEventListener("message", (event) => appendLog(chatLog, event.data));
@@ -289,6 +322,7 @@ document.getElementById("chat-send").addEventListener("click", () => {
   }
   const message = document.getElementById("chat-message").value.trim();
   if (!message) return;
+  logCommand(`chat send ${shellQuote(message)}`);
   state.chatSocket.send(JSON.stringify({ text: message }));
 });
 
@@ -307,6 +341,7 @@ document.getElementById("sync-connect").addEventListener("click", () => {
   const url = wsURL("/ws");
   const socket = new WebSocket(url);
   state.syncSocket = socket;
+  logCommand(`wscat -c ${shellQuote(url)}`);
   appendLog(syncLog, `Connecting to ${url}`);
   socket.addEventListener("open", () => appendLog(syncLog, "Sync connected"));
   socket.addEventListener("message", (event) => appendLog(syncLog, event.data));
