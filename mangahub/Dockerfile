@@ -33,7 +33,7 @@ COPY --from=builder /src/web /app/web
 
 RUN chmod +x /app/app
 
-ENV MANGAHUB_DATA_PATH=/app/web
+ENV MANGAHUB_WEB_ROOT=/app/web
 
 USER app
 
