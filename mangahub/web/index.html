@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MangaHub Feature Demo</title>
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">MangaHub</p>
+      <h1>Feature Demo UI</h1>
+      <p class="muted">A lightweight front end to exercise the public and authenticated APIs.</p>
+    </div>
+    <div class="hero-card">
+      <label class="field">
+        <span>API Base URL</span>
+        <input id="base-url" type="url" placeholder="http://localhost:8080" />
+      </label>
+      <div class="actions">
+        <button id="base-url-save" class="primary">Use Base URL</button>
+        <button id="health-check">Health</button>
+        <button id="ready-check">Ready</button>
+      </div>
+      <p class="muted">Current token: <span id="token-preview">(none)</span></p>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Auth</h2>
+      <div class="grid two">
+        <form id="register-form" class="stack">
+          <h3>Register</h3>
+          <input name="username" placeholder="username" required />
+          <input name="email" type="email" placeholder="email" required />
+          <input name="password" type="password" placeholder="password" minlength="8" required />
+          <button class="primary" type="submit">Create Account</button>
+        </form>
+        <form id="login-form" class="stack">
+          <h3>Login</h3>
+          <input name="email" type="email" placeholder="email" required />
+          <input name="password" type="password" placeholder="password" required />
+          <button class="primary" type="submit">Login</button>
+        </form>
+      </div>
+      <div class="grid three">
+        <form id="change-password-form" class="stack">
+          <h3>Change Password</h3>
+          <input name="old_password" type="password" placeholder="old password" required />
+          <input name="new_password" type="password" placeholder="new password" minlength="8" required />
+          <button type="submit">Update Password</button>
+        </form>
+        <div class="stack">
+          <h3>Session</h3>
+          <button id="me-button">Get /users/me</button>
+          <button id="logout-button">Logout</button>
+        </div>
+        <div class="stack">
+          <h3>Token Tools</h3>
+          <textarea id="token-input" rows="4" placeholder="Paste token to store"></textarea>
+          <button id="token-save">Save Token</button>
+          <button id="token-clear">Clear Token</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Manga Catalog</h2>
+      <div class="grid two">
+        <form id="manga-list-form" class="stack">
+          <h3>Search &amp; List</h3>
+          <input name="q" placeholder="query" />
+          <input name="status" placeholder="status (optional)" />
+          <input name="genres" placeholder="genres comma separated" />
+          <div class="grid two">
+            <input name="limit" type="number" placeholder="limit" />
+            <input name="offset" type="number" placeholder="offset" />
+          </div>
+          <button type="submit">Fetch List</button>
+        </form>
+        <form id="manga-get-form" class="stack">
+          <h3>Get Manga</h3>
+          <input name="id" placeholder="manga id" required />
+          <button type="submit">Fetch Manga</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Library (Auth Required)</h2>
+      <div class="grid two">
+        <form id="library-upsert-form" class="stack">
+          <h3>Add / Update</h3>
+          <input name="manga_id" placeholder="manga id" required />
+          <input name="current_chapter" type="number" placeholder="current chapter" />
+          <input name="status" placeholder="reading / completed / wish_list / blacklist" required />
+          <button type="submit">Save Library Item</button>
+        </form>
+        <form id="library-list-form" class="stack">
+          <h3>List Items</h3>
+          <input name="status" placeholder="status filter" />
+          <div class="grid two">
+            <input name="limit" type="number" placeholder="limit" />
+            <input name="offset" type="number" placeholder="offset" />
+          </div>
+          <button type="submit">Fetch Library</button>
+        </form>
+      </div>
+      <div class="grid two">
+        <form id="library-get-form" class="stack">
+          <h3>Get One</h3>
+          <input name="manga_id" placeholder="manga id" required />
+          <button type="submit">Fetch Item</button>
+        </form>
+        <form id="library-delete-form" class="stack">
+          <h3>Delete</h3>
+          <input name="manga_id" placeholder="manga id" required />
+          <button type="submit">Delete Item</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Progress (Auth Required)</h2>
+      <div class="grid two">
+        <form id="progress-add-form" class="stack">
+          <h3>Add Progress</h3>
+          <input name="manga_id" placeholder="manga id" required />
+          <input name="chapter" type="number" placeholder="chapter" required />
+          <input name="volume" type="number" placeholder="volume (optional)" />
+          <button type="submit">Add Progress</button>
+        </form>
+        <form id="progress-list-form" class="stack">
+          <h3>List Progress</h3>
+          <input name="manga_id" placeholder="manga id" required />
+          <div class="grid two">
+            <input name="limit" type="number" placeholder="limit" />
+            <input name="offset" type="number" placeholder="offset" />
+          </div>
+          <button type="submit">Fetch Progress</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Reviews</h2>
+      <div class="grid two">
+        <form id="reviews-list-form" class="stack">
+          <h3>List Reviews</h3>
+          <input name="manga_id" placeholder="manga id" required />
+          <div class="grid two">
+            <input name="limit" type="number" placeholder="limit" />
+            <input name="offset" type="number" placeholder="offset" />
+          </div>
+          <button type="submit">Fetch Reviews</button>
+        </form>
+        <form id="reviews-create-form" class="stack">
+          <h3>Create Review (Auth)</h3>
+          <input name="manga_id" placeholder="manga id" required />
+          <input name="rating" type="number" min="1" max="5" placeholder="rating 1-5" required />
+          <textarea name="text" rows="3" placeholder="review text"></textarea>
+          <button type="submit">Create Review</button>
+        </form>
+      </div>
+      <form id="reviews-delete-form" class="stack">
+        <h3>Delete Review (Auth)</h3>
+        <input name="id" type="number" placeholder="review id" required />
+        <button type="submit">Delete Review</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Chat (WebSocket)</h2>
+      <div class="grid two">
+        <div class="stack">
+          <label class="field">
+            <span>Room</span>
+            <input id="chat-room" placeholder="general" />
+          </label>
+          <label class="field">
+            <span>User</span>
+            <input id="chat-user" placeholder="anon" />
+          </label>
+          <button id="chat-connect">Connect</button>
+          <button id="chat-disconnect">Disconnect</button>
+        </div>
+        <div class="stack">
+          <label class="field">
+            <span>Message</span>
+            <input id="chat-message" placeholder="Hello world" />
+          </label>
+          <button id="chat-send">Send Message</button>
+          <button id="chat-history">Load History</button>
+        </div>
+      </div>
+      <pre id="chat-log" class="log"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Sync Events (WebSocket)</h2>
+      <p class="muted">Listen for library updates broadcast from the server.</p>
+      <div class="actions">
+        <button id="sync-connect">Connect</button>
+        <button id="sync-disconnect">Disconnect</button>
+      </div>
+      <pre id="sync-log" class="log"></pre>
+    </section>
+
+    <section class="card">
+      <h2>Response Viewer</h2>
+      <p class="muted">Latest REST response or WebSocket status.</p>
+      <pre id="output" class="log"></pre>
+    </section>
+  </main>
+
+  <footer class="footer">Built for quick exploration of the MangaHub API surface.</footer>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
